@@ -1,0 +1,29 @@
+# Mira cada 10 minutos que las webs respondan. Si una falla dos veces seguidas (con 1 minuto entre medias),
+# la ejecución sale en rojo y GitHub manda un correo a la cuenta dietalvaro-stack.
+# shortcut: GitHub no garantiza el minuto exacto (a veces llega 5-15 min tarde); si hace falta precisión, un servicio de pago.
+name: Vigia webs
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+jobs:
+  mirar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Comprobar webs
+        run: |
+          UA="Mozilla/5.0 (vigia-webs dietalvaro)"
+          URLS="https://dietalvaro.com/ https://membresia.dietalvaro.com/ https://membresia.dietalvaro.com/login/"
+          mirar() { curl -s -o /dev/null -w '%{http_code}' -A "$UA" --max-time 30 -L "$1"; }
+          caidas=""
+          for u in $URLS; do
+            c=$(mirar "$u")
+            if [ "$c" != "200" ]; then sleep 60; c=$(mirar "$u"); fi
+            echo "$u -> $c"
+            [ "$c" = "200" ] || caidas="$caidas $u ($c)"
+          done
+          if [ -n "$caidas" ]; then
+            echo "::error::Web caida:$caidas"
+            exit 1
+          fi
